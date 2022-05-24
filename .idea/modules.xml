@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/ShakeSensor.iml" filepath="$PROJECT_DIR$/.idea/modules/ShakeSensor.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/ShakeSensor.app.iml" filepath="$PROJECT_DIR$/.idea/modules/app/ShakeSensor.app.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/ShakeSensor.app.androidTest.iml" filepath="$PROJECT_DIR$/.idea/modules/app/ShakeSensor.app.androidTest.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/ShakeSensor.app.main.iml" filepath="$PROJECT_DIR$/.idea/modules/app/ShakeSensor.app.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/ShakeSensor.app.unitTest.iml" filepath="$PROJECT_DIR$/.idea/modules/app/ShakeSensor.app.unitTest.iml" />
+    </modules>
+  </component>
+</project>
