@@ -7,6 +7,8 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.Bundle;
+import android.view.View;
+import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
@@ -27,39 +29,48 @@ import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
 public class MainActivity extends AppCompatActivity implements SensorEventListener {
 
     private SensorManager mSensorManager;
     private Sensor mAccelerometer;
-    private double currentAccelerationValue;
     private double prevAcceletarionValue;
     private int pointsPlotted = 0;
-    private int graphInterAnInt = 0;
     Viewport viewport;
 
-    LineGraphSeries<DataPoint> series = new LineGraphSeries<DataPoint>(new DataPoint[] {});
+    LineGraphSeries<DataPoint> series = new LineGraphSeries<>(new DataPoint[]{});
 
     TextView txt_currentAccel, txt_prevAccel, txt_acceleration;
     ProgressBar progressShakeMeter;
+    Button button;
 
     MqttAndroidClient mqttAndroidClient;
 
     final String serverUri = "ws://34.125.103.25:8083/mqtt";
 
-    String clientId = "ExampleAndroidClient";
+    String clientId = "ExampleAndroidClient2";
     final String subscriptionTopic = "exampleAndroidTopic";
-    final String publishTopic = "exampleAndroidPublishTopic";
-    final String publishMessage = "TIENE QUE FUNCIONAR";
+    final String publishTopic = "aceleracion";
+    final String publishMessage = "mensaje aceleracion";
+    double acceleration;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        mqttConnection();
+
         progressShakeMeter = findViewById(R.id.progShakeMeter);
         txt_acceleration = findViewById(R.id.txtAccel);
         txt_currentAccel = findViewById(R.id.txtCurrAccel);
         txt_prevAccel = findViewById(R.id.txtPrevAccel);
+        button = findViewById(R.id.button);
 
         mSensorManager = (SensorManager)getSystemService(SENSOR_SERVICE);
         mAccelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
@@ -70,6 +81,20 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         viewport.setXAxisBoundsManual(true);
         graph.addSeries(series);
 
+        button.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                ScheduledExecutorService execService = Executors.newScheduledThreadPool(2);
+
+                execService.scheduleAtFixedRate(new Runnable() {
+                    public void run() {
+                        publishMessage(acceleration);
+                    }
+                }, 0L, 5L, TimeUnit.SECONDS);
+            }
+        });
+    }
+
+    private void mqttConnection(){
         clientId = clientId + System.currentTimeMillis();
 
         mqttAndroidClient = new MqttAndroidClient(getApplicationContext(), serverUri, clientId);
@@ -106,7 +131,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         mqttConnectOptions.setCleanSession(false);
 
         try {
-            //addToHistory("Connecting to " + serverUri);
             mqttAndroidClient.connect(mqttConnectOptions, null, new IMqttActionListener() {
                 @Override
                 public void onSuccess(IMqttToken asyncActionToken) {
@@ -143,13 +167,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     @Override
     public void onSensorChanged(SensorEvent sensorEvent) {
-        //
         float x = sensorEvent.values[0];
         float y = sensorEvent.values[1];
         float z = sensorEvent.values[2];
 
         // Normalicen aceleration on the three axis
-        currentAccelerationValue = Math.sqrt((x*x + y*y + z*z));
+        double currentAccelerationValue = Math.sqrt((x * x + y * y + z * z));
         double changeInAccelleration = Math.abs(currentAccelerationValue - prevAcceletarionValue);
         prevAcceletarionValue = currentAccelerationValue;
 
@@ -157,7 +180,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         txt_prevAccel.setText("Previa: "+(int)prevAcceletarionValue);
         txt_acceleration.setText("Cambio de aceleración: "+changeInAccelleration);
 
-        //System.out.println("LOG: " + changeInAccelleration);
+        acceleration = changeInAccelleration;
 
         progressShakeMeter.setProgress((int) changeInAccelleration);
 
@@ -199,12 +222,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         }
     }
 
-    public void publishMessage(){
+    public void publishMessage(double acceleration){
+        String accelerationString = String.valueOf(acceleration);
         try {
             MqttMessage message = new MqttMessage();
-            message.setPayload(publishMessage.getBytes());
+            message.setPayload(accelerationString.getBytes());
             mqttAndroidClient.publish(publishTopic, message);
-            System.out.println("LOG: Message Published");
+            System.out.println("LOG: Message Published, {Topic: " + publishTopic + " Message: " + accelerationString + "}");
             if(!mqttAndroidClient.isConnected()){
                 System.out.println("LOG: " + mqttAndroidClient.getBufferedMessageCount() + " messages in buffer.");
             }
