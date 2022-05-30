@@ -57,7 +57,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     final String subscriptionTopic = "exampleAndroidTopic";
     final String publishTopic = "aceleracion";
     final String publishMessage = "mensaje aceleracion";
-    double acceleration;
+    String accelerationJson;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -87,7 +87,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
                 execService.scheduleAtFixedRate(new Runnable() {
                     public void run() {
-                        publishMessage(acceleration);
+                        publishMessage(accelerationJson);
                     }
                 }, 0L, 5L, TimeUnit.SECONDS);
             }
@@ -180,14 +180,16 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         txt_prevAccel.setText("Previa: "+(int)prevAcceletarionValue);
         txt_acceleration.setText("Cambio de aceleración: "+changeInAccelleration);
 
-        acceleration = changeInAccelleration;
-
         progressShakeMeter.setProgress((int) changeInAccelleration);
 
         pointsPlotted++;
         series.appendData(new DataPoint(pointsPlotted, changeInAccelleration), true, pointsPlotted);
         viewport.setMaxX(pointsPlotted);
         viewport.setMinX(pointsPlotted-200);
+
+        accelerationJson = "{\"aceleracion\":\""+changeInAccelleration+"\",\"pointsPlotted\":\""+pointsPlotted+"\"}";
+
+        System.out.println(accelerationJson);
     }
 
     @Override
@@ -222,13 +224,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         }
     }
 
-    public void publishMessage(double acceleration){
-        String accelerationString = String.valueOf(acceleration);
+    public void publishMessage(String acceleration){
         try {
             MqttMessage message = new MqttMessage();
-            message.setPayload(accelerationString.getBytes());
+            message.setPayload(acceleration.getBytes());
             mqttAndroidClient.publish(publishTopic, message);
-            System.out.println("LOG: Message Published, {Topic: " + publishTopic + " Message: " + accelerationString + "}");
+            System.out.println("LOG: Message Published, {Topic: " + publishTopic + " Message: " + acceleration + "}");
             if(!mqttAndroidClient.isConnected()){
                 System.out.println("LOG: " + mqttAndroidClient.getBufferedMessageCount() + " messages in buffer.");
             }
