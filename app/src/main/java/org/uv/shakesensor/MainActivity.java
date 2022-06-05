@@ -1,7 +1,9 @@
 package org.uv.shakesensor;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.content.DialogInterface;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -47,17 +49,22 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     TextView txt_currentAccel, txt_prevAccel, txt_acceleration;
     ProgressBar progressShakeMeter;
-    Button button;
+    Button buttonPublish;
+    Button buttonUnsubscribe;
 
     MqttAndroidClient mqttAndroidClient;
 
     final String serverUri = "ws://34.125.103.25:8083/mqtt";
 
-    String clientId = "ExampleAndroidClient2";
-    final String subscriptionTopic = "exampleAndroidTopic";
-    final String publishTopic = "aceleracion";
-    final String publishMessage = "mensaje aceleracion";
+    String clientId = android.os.Build.MODEL;;
+    final String subscriptionTopic = "cliente/respuesta";
+    final String topicAcceleration = "emulador/aceleracion";
+    final String topicSteps = "emulador/pasos";
+    final String topics = "emulador/#";
+    //final String publishMessage = "mensaje aceleracion";
     String accelerationJson;
+    String stepsJson;
+    double acceleration;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -70,7 +77,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         txt_acceleration = findViewById(R.id.txtAccel);
         txt_currentAccel = findViewById(R.id.txtCurrAccel);
         txt_prevAccel = findViewById(R.id.txtPrevAccel);
-        button = findViewById(R.id.button);
+        buttonPublish = findViewById(R.id.buttonPublish);
+        buttonUnsubscribe = findViewById(R.id.buttonUnsubscribe);
 
         mSensorManager = (SensorManager)getSystemService(SENSOR_SERVICE);
         mAccelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
@@ -81,22 +89,29 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         viewport.setXAxisBoundsManual(true);
         graph.addSeries(series);
 
-        button.setOnClickListener(new View.OnClickListener() {
+        buttonPublish.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 ScheduledExecutorService execService = Executors.newScheduledThreadPool(2);
 
                 execService.scheduleAtFixedRate(new Runnable() {
                     public void run() {
-                        publishMessage(accelerationJson);
+                        publishMessage(accelerationJson, topicAcceleration);
+                        publishMessage(stepsJson, topicSteps);
                     }
                 }, 0L, 5L, TimeUnit.SECONDS);
+
+                subscribeToTopic();
+            }
+        });
+
+        buttonUnsubscribe.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                unsubscribeToTopic(topics);
             }
         });
     }
 
     private void mqttConnection(){
-        clientId = clientId + System.currentTimeMillis();
-
         mqttAndroidClient = new MqttAndroidClient(getApplicationContext(), serverUri, clientId);
         mqttAndroidClient.setCallback(new MqttCallbackExtended() {
             @Override
@@ -104,7 +119,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
                 if (reconnect) {
                     System.out.println("LOG: Reconnected to : " + serverURI);
-                    subscribeToTopic();
+                    //subscribeToTopic();
                 } else {
                     System.out.println("Connected to: " + serverURI);
                 }
@@ -118,6 +133,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             @Override
             public void messageArrived(String topic, MqttMessage message) throws Exception {
                 System.out.println("LOG Incoming message: " + new String(message.getPayload()));
+                alert(new String(message.getPayload()));
             }
 
             @Override
@@ -140,7 +156,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     disconnectedBufferOptions.setPersistBuffer(false);
                     disconnectedBufferOptions.setDeleteOldestMessages(false);
                     mqttAndroidClient.setBufferOpts(disconnectedBufferOptions);
-                    subscribeToTopic();
+                    //subscribeToTopic();
                 }
 
                 @Override
@@ -153,6 +169,19 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         } catch (MqttException ex){
             ex.printStackTrace();
         }
+    }
+
+    public void alert(String message){
+        AlertDialog alertDialog = new AlertDialog.Builder(MainActivity.this).create();
+        alertDialog.setTitle("AGUARDA");
+        alertDialog.setMessage(message);
+        alertDialog.setButton(AlertDialog.BUTTON_NEUTRAL, "OK",
+                new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                    }
+                });
+        alertDialog.show();
     }
 
     protected void onResume() {
@@ -180,6 +209,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         txt_prevAccel.setText("Previa: "+(int)prevAcceletarionValue);
         txt_acceleration.setText("Cambio de aceleración: "+changeInAccelleration);
 
+        acceleration = changeInAccelleration;
+
         progressShakeMeter.setProgress((int) changeInAccelleration);
 
         pointsPlotted++;
@@ -187,9 +218,14 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         viewport.setMaxX(pointsPlotted);
         viewport.setMinX(pointsPlotted-200);
 
-        accelerationJson = "{\"aceleracion\":\""+changeInAccelleration+"\",\"pointsPlotted\":\""+pointsPlotted+"\"}";
+        accelerationJson = "{\"aceleracion\":\""+changeInAccelleration+"\"}";
+        stepsJson = "{\"pointsPlotted\":\""+pointsPlotted+"\"}";
 
-        System.out.println(accelerationJson);
+        if(acceleration>=25){
+            System.out.println("CHOQUE");
+            publishMessage(accelerationJson, topicAcceleration);
+            publishMessage(stepsJson, topicSteps);
+        }
     }
 
     @Override
@@ -209,25 +245,25 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 }
             });
 
-            // THIS DOES NOT WORK!
-            mqttAndroidClient.subscribe(subscriptionTopic, 0, new IMqttMessageListener() {
-                @Override
-                public void messageArrived(String topic, MqttMessage message) throws Exception {
-                    // message Arrived!
-                    System.out.println("Message: " + topic + " : " + new String(message.getPayload()));
-                }
-            });
-
         } catch (MqttException ex){
             System.err.println("Exception whilst subscribing");
             ex.printStackTrace();
         }
     }
 
-    public void publishMessage(String acceleration){
+    public void unsubscribeToTopic(String topic){
+        try {
+            mqttAndroidClient.unsubscribe(topic);
+        } catch (MqttException ex){
+            System.err.println("Exception whilst subscribing");
+            ex.printStackTrace();
+        }
+    }
+
+    public void publishMessage(String messageToPublish, String publishTopic){
         try {
             MqttMessage message = new MqttMessage();
-            message.setPayload(acceleration.getBytes());
+            message.setPayload(messageToPublish.getBytes());
             mqttAndroidClient.publish(publishTopic, message);
             System.out.println("LOG: Message Published, {Topic: " + publishTopic + " Message: " + acceleration + "}");
             if(!mqttAndroidClient.isConnected()){
