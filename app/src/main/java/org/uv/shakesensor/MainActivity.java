@@ -35,6 +35,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends AppCompatActivity implements SensorEventListener {
@@ -56,12 +57,14 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     final String serverUri = "ws://34.125.103.25:8083/mqtt";
 
-    String clientId = android.os.Build.MODEL;;
+    String clientId = android.os.Build.MODEL;
+    ScheduledExecutorService execService;
+    ScheduledFuture<?> scheduledFuture;
     final String subscriptionTopic = "cliente/respuesta";
-    final String topicAcceleration = "emulador/aceleracion";
-    final String topicSteps = "emulador/pasos";
-    final String topics = "emulador/#";
-    //final String publishMessage = "mensaje aceleracion";
+    final String topicAcceleration = "emulador/"+clientId+"/aceleracion";
+    final String topicSteps = "emulador/"+clientId+"/pasos";
+    final String topics = "emulador/"+clientId+"/#";
+    boolean subscription = true;
     String accelerationJson;
     String stepsJson;
     double acceleration;
@@ -91,22 +94,25 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         buttonPublish.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                ScheduledExecutorService execService = Executors.newScheduledThreadPool(2);
+                execService = Executors.newScheduledThreadPool(2);
 
-                execService.scheduleAtFixedRate(new Runnable() {
+                Runnable runnable = new Runnable() {
+                    @Override
                     public void run() {
                         publishMessage(accelerationJson, topicAcceleration);
                         publishMessage(stepsJson, topicSteps);
                     }
-                }, 0L, 5L, TimeUnit.SECONDS);
+                };
 
-                subscribeToTopic();
+                scheduledFuture =
+                        execService.scheduleAtFixedRate(runnable, 0L, 5L, TimeUnit.SECONDS);
             }
         });
 
         buttonUnsubscribe.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 unsubscribeToTopic(topics);
+                subscription = false;
             }
         });
     }
@@ -200,7 +206,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         float y = sensorEvent.values[1];
         float z = sensorEvent.values[2];
 
-        // Normalicen aceleration on the three axis
         double currentAccelerationValue = Math.sqrt((x * x + y * y + z * z));
         double changeInAccelleration = Math.abs(currentAccelerationValue - prevAcceletarionValue);
         prevAcceletarionValue = currentAccelerationValue;
@@ -253,7 +258,18 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     public void unsubscribeToTopic(String topic){
         try {
-            mqttAndroidClient.unsubscribe(topic);
+            mqttAndroidClient.unsubscribe("emulador/M2102J20SG/aceleracion", null, new IMqttActionListener() {
+                @Override
+                public void onSuccess(IMqttToken asyncActionToken) {
+                    scheduledFuture.cancel(false);
+                    System.out.println("LOG: Unsubscribed!");
+                }
+
+                @Override
+                public void onFailure(IMqttToken asyncActionToken, Throwable exception) {
+                    System.out.println("LOG: Failed to Unsubscribe!");
+                }
+            });
         } catch (MqttException ex){
             System.err.println("Exception whilst subscribing");
             ex.printStackTrace();
