@@ -14,7 +14,6 @@ import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
-import com.google.android.material.snackbar.Snackbar;
 import com.jjoe64.graphview.GraphView;
 import com.jjoe64.graphview.Viewport;
 import com.jjoe64.graphview.series.DataPoint;
@@ -24,15 +23,12 @@ import org.eclipse.paho.android.service.MqttAndroidClient;
 import org.eclipse.paho.client.mqttv3.DisconnectedBufferOptions;
 import org.eclipse.paho.client.mqttv3.IMqttActionListener;
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
-import org.eclipse.paho.client.mqttv3.IMqttMessageListener;
 import org.eclipse.paho.client.mqttv3.IMqttToken;
 import org.eclipse.paho.client.mqttv3.MqttCallbackExtended;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -106,6 +102,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
                 scheduledFuture =
                         execService.scheduleAtFixedRate(runnable, 0L, 5L, TimeUnit.SECONDS);
+
+                subscribeToTopic();
             }
         });
 
@@ -238,7 +236,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     public void subscribeToTopic(){
         try {
-            mqttAndroidClient.subscribe(subscriptionTopic, 0, null, new IMqttActionListener() {
+            mqttAndroidClient.subscribe(subscriptionTopic, 2, null, new IMqttActionListener() {
                 @Override
                 public void onSuccess(IMqttToken asyncActionToken) {
                     System.out.println("LOG: Subscribed!");
@@ -258,7 +256,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     public void unsubscribeToTopic(String topic){
         try {
-            mqttAndroidClient.unsubscribe("emulador/M2102J20SG/aceleracion", null, new IMqttActionListener() {
+            mqttAndroidClient.unsubscribe(topics, null, new IMqttActionListener() {
                 @Override
                 public void onSuccess(IMqttToken asyncActionToken) {
                     scheduledFuture.cancel(false);
@@ -281,7 +279,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             MqttMessage message = new MqttMessage();
             message.setPayload(messageToPublish.getBytes());
             mqttAndroidClient.publish(publishTopic, message);
-            System.out.println("LOG: Message Published, {Topic: " + publishTopic + " Message: " + acceleration + "}");
+            if(publishTopic.contains("aceleracion")){
+                System.out.println("LOG: Message Published, {Message: " + messageToPublish + "}");
+            }
             if(!mqttAndroidClient.isConnected()){
                 System.out.println("LOG: " + mqttAndroidClient.getBufferedMessageCount() + " messages in buffer.");
             }
