@@ -56,7 +56,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     String clientId = android.os.Build.MODEL;
     ScheduledExecutorService execService;
     ScheduledFuture<?> scheduledFuture;
-    final String subscriptionTopic = "cliente/respuesta";
+    final String subscriptionTopic = "cliente/"+clientId+"/respuesta";
     final String topicAcceleration = "emulador/"+clientId+"/aceleracion";
     final String topicSteps = "emulador/"+clientId+"/pasos";
     final String topics = "emulador/"+clientId+"/#";
