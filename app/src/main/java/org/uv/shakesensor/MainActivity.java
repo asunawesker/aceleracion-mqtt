@@ -74,7 +74,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        AppCenter.start(getApplication(), "{Your app secret here}",
+        AppCenter.start(getApplication(), "6456b86b-9d5b-4742-896f-cbb53fc52150",
                 Analytics.class, Crashes.class);
 
         mqttConnection();
